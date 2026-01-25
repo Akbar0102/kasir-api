@@ -1,4 +1,4 @@
-Daftar endpoint
+## Daftar endpoint
 
 ### Category
 1. GET /api/categories/{id}
