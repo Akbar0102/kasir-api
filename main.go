@@ -3,16 +3,26 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"kasir-api/database"
+	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
+
+	"github.com/spf13/viper"
 )
 
-type Produk struct {
+type Config struct {
+	Port   string `mapstructure:"PORT"`
+	DBConn string `mapstructure:"DB_CONN"`
+}
+
+type Product struct {
 	ID    int    `json:"id"`
-	Nama  string `json:"nama"`
-	Harga int    `json:"harga"`
-	Stok  int    `json:"stok"`
+	Name  string `json:"name"`
+	Price int    `json:"price"`
+	Stock int    `json:"stock"`
 }
 
 type Category struct {
@@ -21,9 +31,9 @@ type Category struct {
 	Description string `json:"description"`
 }
 
-var produk = []Produk{
-	{ID: 1, Nama: "Indomie Godog", Harga: 3500, Stok: 10},
-	{ID: 2, Nama: "Vit 1000ml", Harga: 3000, Stok: 40},
+var products = []Product{
+	{ID: 1, Name: "Indomie Godog", Price: 3500, Stock: 10},
+	{ID: 2, Name: "Vit 1000ml", Price: 3000, Stock: 40},
 }
 
 var categories = []Category{
@@ -127,7 +137,7 @@ func getProdukByid(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for _, p := range produk {
+	for _, p := range products {
 		if p.ID == id {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(p)
@@ -146,20 +156,20 @@ func updateProduk(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var newProduk Produk
-	err = json.NewDecoder(r.Body).Decode(&newProduk)
+	var newProduct Product
+	err = json.NewDecoder(r.Body).Decode(&newProduct)
 	if err != nil {
 		http.Error(w, "Invalid Produk ID", http.StatusBadRequest)
 		return
 	}
 
-	for i := range produk {
-		if produk[i].ID == id {
-			newProduk.ID = id
-			produk[i] = newProduk
+	for i := range products {
+		if products[i].ID == id {
+			newProduct.ID = id
+			products[i] = newProduct
 
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(produk)
+			json.NewEncoder(w).Encode(products)
 			return
 		}
 	}
@@ -173,9 +183,9 @@ func deleteProduk(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for i, p := range produk {
+	for i, p := range products {
 		if p.ID == id {
-			produk = append(produk[:i], produk[i+1:]...)
+			products = append(products[:i], products[i+1:]...)
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]string{
 				"message": "success",
@@ -231,22 +241,22 @@ func main() {
 		switch r.Method {
 		case "GET":
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(produk)
+			json.NewEncoder(w).Encode(products)
 		case "POST":
 			// baca dari request
-			var produkBaru Produk
-			err := json.NewDecoder(r.Body).Decode(&produkBaru)
+			var newProduct Product
+			err := json.NewDecoder(r.Body).Decode(&newProduct)
 			if err != nil {
 				http.Error(w, "invalid request", http.StatusBadRequest)
 				return
 			}
 
 			// masukkan data ke dalam variable produk
-			produkBaru.ID = len(produk) + 1
-			produk = append(produk, produkBaru)
+			newProduct.ID = len(products) + 1
+			products = append(products, newProduct)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated) // 201
-			json.NewEncoder(w).Encode(produkBaru)
+			json.NewEncoder(w).Encode(newProduct)
 		}
 	})
 
@@ -259,9 +269,30 @@ func main() {
 		})
 	})
 
-	fmt.Println("server running di localhost:8080")
-	err := http.ListenAndServe(":8080", nil)
+	viper.AutomaticEnv()
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
+	if _, err := os.Stat(".env"); err == nil {
+		viper.SetConfigFile(".env")
+		_ = viper.ReadInConfig()
+	}
+
+	config := Config{
+		Port: viper.GetString("PORT"),
+		DBConn: viper.GetString("DB_CONN"),
+	}
+
+	db, err := database.InitDB(config.DBConn)
 	if err != nil {
+		log.Fatal("Failed to initialize database:", err)
+	}
+	defer db.Close()
+
+	addr := "localhost:" + config.Port
+	fmt.Println("server running di " + addr)
+
+	errServer := http.ListenAndServe(addr, nil)
+	if errServer != nil {
 		fmt.Println("gagal running server")
 	}
 }
