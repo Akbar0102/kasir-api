@@ -42,12 +42,20 @@ func main() {
 	productRepo := repositories.NewProductRepository(db)
 	productService := services.NewProductService(productRepo)
 	productHandler := handlers.NewProductHandler(productService)
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{
+		"status": "ok",
+		"message": "Kasir API is running"
+	}`))
+	})
 
 	// Setup routes
 	http.HandleFunc("/api/product", productHandler.HandleProducts)
 	http.HandleFunc("/api/product/", productHandler.HandleProductByID)
 
-	addr := "localhost:" + config.Port
+	addr := "0.0.0.0:" + config.Port
 	fmt.Println("server running di " + addr)
 
 	err = http.ListenAndServe(addr, nil)
