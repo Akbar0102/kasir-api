@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"kasir-api/database"
+	"kasir-api/handlers"
+	"kasir-api/repositories"
+	"kasir-api/services"
 	"log"
 	"net/http"
 	"os"
@@ -196,79 +199,6 @@ func deleteProduk(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	// GET localhost:8080/api/categories/{id}
-	// PUT localhost:8080/api/categories/{id}
-	// DELETE localhost:8080/api/categories/{id}
-	http.HandleFunc("/api/categories/", func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case "GET":
-			getCategoryById(w, r)
-		case "PUT":
-			updateCategory(w, r)
-		case "DELETE":
-			deleteCategory(w, r)
-		}
-	})
-
-	// GET localhost:8080/api/categories
-	// POST localhost:8080/api/categories
-	http.HandleFunc("/api/categories", func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case "GET":
-			getCategories(w, r)
-		case "POST":
-			createCategory(w, r)
-		}
-	})
-
-	// GET localhost:8080/api/produk/{id}
-	// PUT localhost:8080/api/produk/{id}
-	// DELETE localhost:8080/api/produk/{id}
-	http.HandleFunc("/api/produk/", func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case "GET":
-			getProdukByid(w, r)
-		case "PUT":
-			updateProduk(w, r)
-		case "DELETE":
-			deleteProduk(w, r)
-		}
-	})
-
-	// GET localhost:8080/api/produk
-	// POST localhost:8080/api/produk
-	http.HandleFunc("/api/produk", func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case "GET":
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(products)
-		case "POST":
-			// baca dari request
-			var newProduct Product
-			err := json.NewDecoder(r.Body).Decode(&newProduct)
-			if err != nil {
-				http.Error(w, "invalid request", http.StatusBadRequest)
-				return
-			}
-
-			// masukkan data ke dalam variable produk
-			newProduct.ID = len(products) + 1
-			products = append(products, newProduct)
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusCreated) // 201
-			json.NewEncoder(w).Encode(newProduct)
-		}
-	})
-
-	// localhost:8080/health
-	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{
-			"status":  "OK",
-			"message": "API running",
-		})
-	})
-
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
@@ -278,7 +208,7 @@ func main() {
 	}
 
 	config := Config{
-		Port: viper.GetString("PORT"),
+		Port:   viper.GetString("PORT"),
 		DBConn: viper.GetString("DB_CONN"),
 	}
 
@@ -287,6 +217,14 @@ func main() {
 		log.Fatal("Failed to initialize database:", err)
 	}
 	defer db.Close()
+
+	productRepo := repositories.NewProductRepository(db)
+	productService := services.NewProductService(productRepo)
+	productHandler := handlers.NewProductHandler(productService)
+
+	// Setup routes
+	http.HandleFunc("/api/product", productHandler.HandleProducts)
+	http.HandleFunc("/api/product/", productHandler.HandleProductByID)
 
 	addr := "localhost:" + config.Port
 	fmt.Println("server running di " + addr)
