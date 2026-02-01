@@ -42,6 +42,11 @@ func main() {
 	productRepo := repositories.NewProductRepository(db)
 	productService := services.NewProductService(productRepo)
 	productHandler := handlers.NewProductHandler(productService)
+
+	categoryRepo := repositories.NewCategoryRepository(db)
+	categoryService := services.NewCategoryService(categoryRepo)
+	categoryHandler := handlers.NewCategoryHandler(categoryService)
+
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -54,6 +59,8 @@ func main() {
 	// Setup routes
 	http.HandleFunc("/api/product", productHandler.HandleProducts)
 	http.HandleFunc("/api/product/", productHandler.HandleProductByID)
+	http.HandleFunc("/api/category", categoryHandler.HandleCategory)
+	http.HandleFunc("/api/category/", categoryHandler.HandleCategoryByID)
 
 	addr := "0.0.0.0:" + config.Port
 	fmt.Println("server running di " + addr)
